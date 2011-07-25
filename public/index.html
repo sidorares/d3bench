@@ -1,0 +1,161 @@
+<html>
+  <head>
+    <title>d3bench</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="d3/d3.js"></script>
+    <script type="text/javascript" src="d3/d3.layout.js"></script>
+    <style>
+
+body {
+  font: normal 13px arial,sans-serif;
+  margin: 0;
+}
+
+h1 {
+  margin: 0;
+  padding: 0.5em;
+  border-bottom: #D2D2D2;
+  background-color: #F1F1F1;
+  font-size: 14pt;
+}
+
+#form {
+  display: block;
+}
+
+#form * {
+  margin: 1em;
+  display: inline;
+}
+
+#url {
+  margin: 0;
+  padding: 0;
+  width: 30em;
+}
+
+svg {
+  display: block;
+  margin: 1em;
+}
+
+circle {
+  fill: steelblue;
+  stroke-width: 0;
+  fill-opacity: 0.2;
+  stroke-opacity: 0.8;
+}
+
+    </style>
+  </head>
+  <body>
+    <h1>d3bench</h1>
+    <form id="form">
+      <label for="name">url</label>
+      <input id="url" name="url" value="http://localhost:8000/"/>
+      <label for="concurrency">concurrency</label>
+      <input id="concurrency" name="concurrency" value="10"/>
+      <label for="requests">requests</label>
+      <input id="requests" name="requests" value="5000"/>
+      <input id="button" type="button" value="bench" />
+    </form>
+    <div id="results"></div>
+  </body>
+  <script>
+var socket = io.connect();
+
+var formElement = document.getElementById('form');
+var button = document.getElementById('button');
+var urlElement = document.getElementById('url');
+var concurrencyElement = document.getElementById('concurrency');
+var requestsElement = document.getElementById('requests');
+
+var bench;
+var requests = 5000;
+
+var w = 500, h = 200;
+
+var x = d3.scale.linear()
+  .domain([0, requests - 1])
+  .range([0, w]);
+
+var y = d3.scale.linear()
+  .domain([0, 50])
+  .range([h, 0]);
+
+
+button.onclick = function() {
+  formElement.style.display = 'none';
+
+  socket.emit("bench", {
+    concurrency: Number(concurrency.value),
+    requests: Number(requestsElement.value),
+    url: urlElement.value
+  });
+
+  bench = {
+    total: 0,
+    sum: 0,
+    data: []
+  };
+
+  bench.graph = d3.select("#results")
+    .insert("svg:svg", "svg")
+      .attr("width", w)
+      .attr("height", h)
+    .append("svg:g")
+      .attr("transform", "translate(20,0)");
+
+  bench.graph.selectAll("line")
+       .data(y.ticks(10))
+     .enter().append("svg:line")
+       .attr("x1", 0)
+       .attr("x2", w)
+       .attr("y1", y)
+       .attr("y2", y)
+       .attr("stroke", "#eee");
+
+  // grid labels.
+  bench.graph.selectAll("text.rule")
+    .data(y.ticks(10))
+    .enter().append("svg:text")
+      .attr("class", "rule")
+      .attr("y", y)
+      .attr("x", -20)
+      .text(String);
+
+  bench.interval = setInterval(updateGraph, 100);
+
+  return false;
+};
+
+function updateGraph() {
+  bench.graph.selectAll("circle")
+      .data(bench.data)
+      .enter().append("svg:circle")
+        .attr('r', 3)
+        .attr('cx', function(d, i) { return x(i) })
+        .attr('cy', y);
+}
+
+socket.on('progress', function(result) {
+  bench.total++;
+  bench.sum += result.diff;
+  bench.data.push(result.diff);
+});
+
+socket.on('complete', function() {
+  formElement.style.display = 'block';
+  console.log("avergae response time (ms): ", bench.sum / bench.total);
+  clearInterval(bench.interval);
+  updateGraph();
+  bench = null;
+});
+
+
+
+
+
+  </script>
+</html>
+

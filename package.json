@@ -1,0 +1,6 @@
+{ 
+  "name": "d3bench",
+  "author": "Ryan Dahl <ry@tinyclouds.org>",
+  "version": "0.0.1",
+  "bin": "server.js"
+}
